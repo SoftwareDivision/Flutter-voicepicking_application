@@ -1,0 +1,69 @@
+name: flutter_voice_picking
+description: "A professional Voice Picking application for warehouse operations with speech recognition and TTS capabilities."
+
+# Prevent accidental publishing
+publish_to: 'none'
+
+# App version
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UPDATED Voice & Speech Recognition packages
+  speech_to_text: ^7.3.0        # Updated from ^6.3.0
+  flutter_tts: ^4.2.3           # Updated from ^3.7.0
+  permission_handler: ^12.0.1   # Updated from ^10.4.3
+
+
+ # Database Dependencies (CRITICAL)
+  sqflite: ^2.4.2
+  path_provider: ^2.1.4              # ✅ MUST BE HERE
+  path: ^1.9.1
+
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.9.1
+  supabase: ^2.2.2
+  flutter_barcode_scanner_plus: ^3.0.5
+  pdf: ^3.11.3
+  excel: ^4.0.6
+  printing: ^5.14.2
+  open_file: ^3.5.10
+  csv: ^6.0.0
+  share_plus: ^11.1.0
+  cross_file: ^0.3.4+2
+  intl: ^0.20.2
+  
+
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: "^0.14.4"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/icon.png"
+  # UPDATED Linting
+  flutter_lints: ^6.0.0         # Updated from ^5.0.0
+
+flutter:
+  uses-material-design: true
+  
+  # Assets (add if needed later)
+  # assets:
+  #   - assets/images/
+  #   - assets/sounds/
+  
+  # Custom fonts (add if needed later)
+  # fonts:
+  #   - family: WorkSans
+  #     fonts:
+  #       - asset: assets/fonts/WorkSans-Regular.ttf
+  #       - asset: assets/fonts/WorkSans-Bold.ttf
+  #         weight: 700

@@ -1,0 +1,425 @@
+// 🔥 OPTIMIZED FOR HONEYWELL EDA51 ANDROID DEVICE
+static Future<String> savePackagingSlipForAndroid({
+  required PackagingReportData reportData,
+}) async {
+  try {
+    log('📄 Generating packaging slip for EDA51 device...');
+    
+    final htmlContent = generatePackagingSlipHTML(reportData: reportData);
+    
+    // 🔥 Save to Android Downloads folder (accessible to all apps)
+    String filePath;
+    
+    if (Platform.isAndroid) {
+      // Get Downloads directory on Android
+      final directory = Directory('/storage/emulated/0/Download');
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      
+      final fileName = 'PackagingSlip_${reportData.order.orderNumber}_Box${reportData.boxNumber}.html';
+      filePath = '${directory.path}/$fileName';
+      
+      final file = File(filePath);
+      await file.writeAsString(htmlContent);
+      
+      log('✅ HTML saved to Downloads: $filePath');
+    } else {
+      // Fallback for other platforms
+      final directory = await getTemporaryDirectory();
+      filePath = '${directory.path}/packaging_slip_${reportData.carton.cartonBarcode}.html';
+      final file = File(filePath);
+      await file.writeAsString(htmlContent);
+    }
+    
+    return filePath;
+  } catch (e) {
+    log('❌ Failed to save HTML: $e');
+    throw PackagingException('Failed to save report', details: e);
+  }
+}
+
+// 🔥 Generate mobile-optimized HTML for EDA51
+static String generatePackagingSlipHTML({
+  required PackagingReportData reportData,
+}) {
+  final order = reportData.order;
+  final carton = reportData.carton;
+  final items = reportData.items;
+  final boxNumber = reportData.boxNumber;
+  final totalBoxes = reportData.totalBoxes;
+  final session = reportData.session;
+  
+  final totalItemsInBox = items.fold(0, (sum, item) => sum + item.quantity);
+  final currentDate = _formatDateTime(carton.sealedAt ?? DateTime.now());
+  
+  return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packaging Slip - ${order.orderNumber}</title>
+    <style>
+        /* 🎨 OPTIMIZED FOR PRINTING & MOBILE */
+        @page {
+            size: A4;
+            margin: 8mm;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
+            color: #000;
+            background: #fff;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            border: 3px solid #000;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: #f0f0f0;
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 3px;
+            letter-spacing: 2px;
+        }
+        
+        .box-highlight {
+            background: #fff9c4;
+            border: 3px dashed #ff9800;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .box-highlight .box-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #e65100;
+            margin-bottom: 5px;
+        }
+        
+        .section {
+            border: 2px solid #000;
+            padding: 10px;
+            margin-bottom: 12px;
+            background: #fff;
+        }
+        
+        .section-header {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #000;
+            text-transform: uppercase;
+        }
+        
+        .info-row {
+            display: flex;
+            padding: 4px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            width: 130px;
+            flex-shrink: 0;
+            font-size: 10px;
+        }
+        
+        .info-value {
+            flex: 1;
+            font-size: 10px;
+            word-break: break-word;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+        
+        table th {
+            background: #000;
+            color: #fff;
+            padding: 8px 5px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 10px;
+            border: 1px solid #000;
+        }
+        
+        table td {
+            padding: 6px 5px;
+            border: 1px solid #000;
+            font-size: 10px;
+        }
+        
+        table tbody tr:nth-child(even) {
+            background: #f5f5f5;
+        }
+        
+        .total-row {
+            font-weight: bold;
+            background: #e0e0e0 !important;
+            border-top: 3px solid #000 !important;
+        }
+        
+        .footer {
+            border: 2px solid #000;
+            padding: 15px;
+            text-align: center;
+            margin-top: 15px;
+            background: #f0f0f0;
+        }
+        
+        .footer .verify-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .footer .barcode {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            letter-spacing: 2px;
+            padding: 8px;
+            background: #fff;
+            border: 1px solid #000;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        
+        /* 🔥 FLOATING PRINT BUTTON FOR EDA51 */
+        .print-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .print-button:active {
+            background: #45a049;
+            transform: scale(0.95);
+        }
+        
+        /* 🖨️ PRINT STYLES */
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+            
+            .print-button {
+                display: none !important;
+            }
+            
+            .section {
+                page-break-inside: avoid;
+            }
+            
+            table {
+                page-break-inside: avoid;
+            }
+        }
+        
+        /* 📱 MOBILE OPTIMIZATION */
+        @media screen and (max-width: 600px) {
+            body {
+                font-size: 10px;
+            }
+            
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .box-highlight .box-number {
+                font-size: 24px;
+            }
+            
+            .info-label {
+                width: 110px;
+                font-size: 9px;
+            }
+            
+            .info-value {
+                font-size: 9px;
+            }
+            
+            table th, table td {
+                padding: 5px 3px;
+                font-size: 9px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 🔥 PRINT BUTTON (Bottom-right floating) -->
+    <button class="print-button" onclick="window.print()" title="Print Slip">
+        🖨️
+    </button>
+    
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>PACKAGING SLIP</h1>
+            <div style="font-size: 11px;">Warehouse Management System</div>
+        </div>
+        
+        <!-- Box Highlight -->
+        <div class="box-highlight">
+            <div class="box-number">BOX $boxNumber OF $totalBoxes</div>
+            <div style="font-size: 11px; margin-top: 5px;">
+                <strong>Carton:</strong> ${carton.cartonBarcode}
+            </div>
+        </div>
+        
+        <!-- Order Details -->
+        <div class="section">
+            <div class="section-header">📦 Order Details</div>
+            <div class="info-row">
+                <div class="info-label">Order Number:</div>
+                <div class="info-value"><strong>${order.orderNumber}</strong></div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Customer:</div>
+                <div class="info-value">${order.customerName}</div>
+            </div>
+            ${order.customerPhone != null ? '''
+            <div class="info-row">
+                <div class="info-label">Phone:</div>
+                <div class="info-value">${order.customerPhone}</div>
+            </div>
+            ''' : ''}
+            ${order.customerEmail != null ? '''
+            <div class="info-row">
+                <div class="info-label">Email:</div>
+                <div class="info-value">${order.customerEmail}</div>
+            </div>
+            ''' : ''}
+        </div>
+        
+        <!-- Shipping Address -->
+        ${order.shipToAddress != null ? '''
+        <div class="section">
+            <div class="section-header">📍 Shipping Address</div>
+            <div style="padding: 5px 0; font-size: 10px;">
+                ${order.shipToAddress}
+            </div>
+        </div>
+        ''' : ''}
+        
+        <!-- Box Details -->
+        <div class="section">
+            <div class="section-header">📦 Box Information</div>
+            <div class="info-row">
+                <div class="info-label">Box Type:</div>
+                <div class="info-value">${carton.boxType.toUpperCase()}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Weight:</div>
+                <div class="info-value"><strong>${carton.actualWeight?.toStringAsFixed(2) ?? '0.00'} kg</strong></div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Packed By:</div>
+                <div class="info-value">${session.packagedBy}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Date & Time:</div>
+                <div class="info-value">$currentDate</div>
+            </div>
+        </div>
+        
+        <!-- Items Table -->
+        <div class="section">
+            <div class="section-header">📋 Items in Box</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 35px; text-align: center;">No.</th>
+                        <th>Product Name</th>
+                        <th style="width: 100px;">SKU</th>
+                        <th style="width: 50px; text-align: center;">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+${items.asMap().entries.map((entry) {
+    final index = entry.key + 1;
+    final item = entry.value;
+    return '''
+                    <tr>
+                        <td style="text-align: center;">$index</td>
+                        <td>${item.productName}</td>
+                        <td>${item.sku}</td>
+                        <td style="text-align: center; font-weight: bold;">${item.quantity}</td>
+                    </tr>
+''';
+  }).join()}
+                    <tr class="total-row">
+                        <td colspan="3" style="text-align: right; padding-right: 10px;">
+                            <strong>TOTAL ITEMS:</strong>
+                        </td>
+                        <td style="text-align: center; font-size: 13px; font-weight: bold;">
+                            $totalItemsInBox
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="verify-text">✅ VERIFIED & SEALED</div>
+            <div class="barcode">${carton.cartonBarcode}</div>
+            <div style="margin-top: 10px; font-size: 9px; color: #666;">
+                Generated: ${_formatDateTime(DateTime.now())}
+            </div>
+        </div>
+        
+        <!-- Instructions for EDA51 -->
+        <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border: 1px solid #2196F3; border-radius: 5px; font-size: 10px;">
+            <strong>📱 Instructions for EDA51:</strong><br>
+            1. Tap 🖨️ button to print<br>
+            2. Select printer from Android Print Service<br>
+            3. Or share via Bluetooth/Email
+        </div>
+    </div>
+</body>
+</html>
+''';
+}
