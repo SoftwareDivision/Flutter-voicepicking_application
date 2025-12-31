@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Order Sheet Uploader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(130deg, #8f94fb 0%, #4e54c8 100%);
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #222;
+      padding-bottom: 40px;
+    }
+    .container {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(80, 60, 180, 0.1);
+      margin: 40px 0;
+      max-width: 700px;
+      width: 100%;
+      padding: 32px 26px 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+      position: relative;
+    }
+    h1 {
+      background: linear-gradient(90deg, #7f53ac, #647dee);
+      color: transparent;
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 2em;
+      font-weight: bold;
+      margin: 0 0 18px;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 28px;
+      font-size: 1em;
+      text-align: center;
+    }
+    form {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .upload-section {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .upload-box {
+      flex-grow: 1;
+      min-width: 250px;
+      border: 2px dashed #8f94fb;
+      background: #f4f7ff;
+      border-radius: 12px;
+      padding: 30px;
+      cursor: pointer;
+      text-align: center;
+      transition: box-shadow 0.2s;
+      box-sizing: border-box;
+    }
+    .upload-box.drag {
+      box-shadow: 0 2px 8px 0 #4e54c844;
+      background: #e5eafe;
+    }
+    .upload-box input[type='file'] {
+      display: none;
+    }
+    .upload-box .upload-text strong {
+      color: #8070d8;
+    }
+    .btn {
+      background: linear-gradient(90deg, #8f94fb, #293edc 80%);
+      color: #fff;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 8px;
+      font-size: 1.05em;
+      font-weight: 600;
+      transition: 0.2s;
+      box-shadow: 0 2px 8px 0 #5560fa36;
+      cursor: pointer;
+      min-width: 120px;
+      height: 56px;
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #uploaded-file-link {
+      margin-top: 12px;
+      font-size: 0.9em;
+      color: #3841a2;
+      text-decoration: underline;
+      cursor: pointer;
+      display: none;
+    }
+    .error {
+      color: #bb2d3b;
+      margin-top: 10px;
+      min-height: 22px;
+    }
+    .success {
+      color: #1c7e40;
+      margin-top: 10px;
+      min-height: 22px;
+    }
+    @media (max-width: 720px) {
+      .container {
+        padding: 24px 20px 40px;
+        margin: 20px;
+      }
+      form {
+        max-width: 100%;
+      }
+      .upload-section {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .upload-box,
+      .btn {
+        width: 100%;
+        min-width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container" role="main" aria-label="Order Sheet Upload">
+    <h1>Order Sheet Upload</h1>
+    <p class="subtitle" id="uploadDescription">
+      Upload your CSV order template. Only rows with complete item data will be processed.
+    </p>
+
+    <form id="uploadForm" novalidate>
+      <div class="upload-section">
+        <label class="upload-box" id="dropzone" aria-describedby="uploadDescription" role="button" tabindex="0">
+          <div class="upload-text">
+            📁 <strong>Drag & drop your CSV file</strong> here, or <span>click to browse</span>
+          </div>
+          <input type="file" id="csvFile" accept=".csv, text/csv" aria-label="Choose CSV file" />
+        </label>
+
+        <button id="uploadBtn" class="btn" type="button" disabled aria-disabled="true" aria-live="polite">
+          Upload to Database
+        </button>
+      </div>
+
+      <div id="status" role="alert" aria-live="assertive"></div>
+      <a id="uploaded-file-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+    </form>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (() => {
+      const supabaseUrl = 'https://wdeatczsfxczijfvnnoo.supabase.co';
+      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZWF0Y3pzZnhjemlqZnZubm9vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODM0NzksImV4cCI6MjA3MDc1OTQ3OX0.cE9EtndVpWqxpY54vVLBNUq4RlgPuMvVq2iGCBMYcDg';
+      const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+      const dropzone = document.getElementById('dropzone');
+      const fileInput = document.getElementById('csvFile');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const statusEl = document.getElementById('status');
+      const uploadedFileLink = document.getElementById('uploaded-file-link');
+
+      let extractedOrder = null;
+      let currentFile = null;
+
+      function setStatus(message, isError = false) {
+        statusEl.textContent = message;
+        statusEl.className = isError ? 'error' : 'success';
+      }
+
+      // Drag/drop events
+      dropzone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropzone.classList.add('drag');
+      });
+      dropzone.addEventListener('dragleave', e => {
+        e.preventDefault();
+        dropzone.classList.remove('drag');
+      });
+      dropzone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropzone.classList.remove('drag');
+        if(e.dataTransfer.files.length) {
+          handleFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('keydown', e => {
+        if(e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener('change', e => {
+        if (fileInput.files.length) {
+          handleFile(fileInput.files[0]);
+        }
+      });
+
+      function handleFile(file) {
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+          setStatus('Only CSV files are supported.', true);
+          uploadedFileLink.style.display = 'none';
+          uploadBtn.disabled = true;
+          return;
+        }
+        currentFile = file;
+        readCSV(file);
+      }
+
+      function readCSV(file) {
+        Papa.parse(file, {
+          complete: function(results) {
+            try {
+              extractedOrder = extractOrderFromCSV(results.data);
+              
+              if (!extractedOrder) {
+                setStatus('No valid order data found in file.', true);
+                uploadBtn.disabled = true;
+                return;
+              }
+
+              if (extractedOrder.items.length === 0) {
+                setStatus('No order items found. Please add at least one product.', true);
+                uploadBtn.disabled = true;
+                return;
+              }
+
+              setStatus(`✅ Order extracted: ${extractedOrder.items.length} item(s) found. Ready to upload.`);
+              uploadBtn.disabled = false;
+              showUploadedFileLink(file);
+            } catch (error) {
+              setStatus('Error parsing CSV: ' + error.message, true);
+              uploadBtn.disabled = true;
+            }
+          },
+          error: function(error) {
+            setStatus('Error reading CSV: ' + error.message, true);
+            uploadBtn.disabled = true;
+          }
+        });
+      }
+
+      function extractOrderFromCSV(rows) {
+        // Extract customer details from fixed positions
+        const customerName = getCellValue(rows, 4, 1);
+        const customerPhone = getCellValue(rows, 5, 1);
+        const customerEmail = getCellValue(rows, 6, 1);
+
+        // Billing address
+        const billStreet = getCellValue(rows, 9, 1);
+        const billCity = getCellValue(rows, 10, 1);
+        const billState = getCellValue(rows, 11, 1);
+        const billZip = getCellValue(rows, 12, 1);
+        const billToAddress = `${billStreet}, ${billCity}, ${billState}, ${billZip}`;
+
+        // Shipping address
+        const shipStreet = getCellValue(rows, 9, 5);
+        const shipCity = getCellValue(rows, 10, 5);
+        const shipState = getCellValue(rows, 11, 5);
+        const shipZip = getCellValue(rows, 12, 5);
+        const shipToAddress = `${shipStreet}, ${shipCity}, ${shipState}, ${shipZip}`;
+
+        // Validate customer info
+        if (!customerName || !customerPhone) {
+          throw new Error('Customer Name and Phone are required');
+        }
+
+        // Extract items starting from row 16 (index 15)
+        const items = [];
+        for (let i = 15; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length < 4) continue;
+
+          const itemName = getCellValue(rows, i, 1);
+          const itemSKU = getCellValue(rows, i, 2);
+          const quantity = getCellValue(rows, i, 3);
+
+          // Only add if item has name AND quantity
+          if (itemName && itemName.trim() && quantity && !isNaN(parseInt(quantity))) {
+            items.push({
+              productName: itemName.trim(),
+              productSKU: itemSKU ? itemSKU.trim() : itemName.trim(),
+              quantity: parseInt(quantity),
+              notes: getCellValue(rows, i, 6) || ''
+            });
+          }
+        }
+
+        return {
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          customerEmail: customerEmail ? customerEmail.trim() : '',
+          billToAddress: billToAddress.trim(),
+          shipToAddress: shipToAddress.trim(),
+          items: items
+        };
+      }
+
+      function getCellValue(rows, rowIndex, colIndex) {
+        if (!rows[rowIndex] || !rows[rowIndex][colIndex]) return '';
+        return rows[rowIndex][colIndex].toString().trim();
+      }
+
+      function showUploadedFileLink(file) {
+        const fileURL = URL.createObjectURL(file);
+        uploadedFileLink.href = fileURL;
+        uploadedFileLink.textContent = `📄 ${file.name} (Click to open)`;
+        uploadedFileLink.style.display = 'inline-block';
+        uploadedFileLink.onclick = () => {
+          window.open(fileURL);
+          return false;
+        };
+      }
+
+      function generateOrderNumber() {
+        return 'ORD-' + Date.now();
+      }
+
+      async function uploadOrder(orderData) {
+        const orderNumber = generateOrderNumber();
+        
+        // Step 1: Insert order into customer_orders table
+        const { data: orderInserted, error: orderError } = await supabase
+          .from('customer_orders')
+          .insert({
+            order_number: orderNumber,
+            customer_name: orderData.customerName,
+            customer_email: orderData.customerEmail,
+            customer_phone: orderData.customerPhone,
+            bill_to_address: orderData.billToAddress,
+            ship_to_address: orderData.shipToAddress,
+            order_status: 'pending',
+            order_date: new Date().toISOString()
+          })
+          .select('order_id')
+          .single();
+
+        if (orderError) {
+          throw new Error('Failed to create order: ' + orderError.message);
+        }
+
+        const orderId = orderInserted.order_id;
+
+        // Step 2: Insert all order items
+        const itemsToInsert = orderData.items.map(item => ({
+          order_id: orderId,
+          product_sku: item.productSKU,
+          product_name: item.productName,
+          quantity_requested: item.quantity,
+          item_status: 'pending'
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) {
+          throw new Error('Failed to insert order items: ' + itemsError.message);
+        }
+
+        return { orderId, orderNumber, itemCount: itemsToInsert.length };
+      }
+
+      uploadBtn.addEventListener('click', async () => {
+        if (!extractedOrder) {
+          setStatus('No order data to upload.', true);
+          return;
+        }
+
+        uploadBtn.disabled = true;
+        setStatus('Uploading order to Supabase...');
+
+        try {
+          const result = await uploadOrder(extractedOrder);
+          setStatus(`✅ Order ${result.orderNumber} uploaded successfully with ${result.itemCount} item(s)!`);
+          
+          // Reset after successful upload
+          setTimeout(() => {
+            extractedOrder = null;
+            fileInput.value = '';
+            uploadedFileLink.style.display = 'none';
+            setStatus('');
+            uploadBtn.disabled = true;
+          }, 3000);
+        } catch (error) {
+          console.error('Upload error:', error);
+          setStatus('❌ Upload failed: ' + error.message, true);
+          uploadBtn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
